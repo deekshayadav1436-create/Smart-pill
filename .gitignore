@@ -2,12 +2,26 @@
 node_modules/
 */node_modules/
 
-# Production build
+# Production build outputs
 dist/
 frontend/dist/
+dist-ssr/
+*.local
+
+# Environment variables (preserve .env.example only)
+.env
+.env*.local
+backend/.env
+frontend/.env
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# Vercel
+.vercel/
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -15,8 +29,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# OS / Editor files
+# OS and IDE files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

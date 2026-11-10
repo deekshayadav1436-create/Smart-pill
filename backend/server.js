@@ -94,6 +94,21 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // ==============================================================================
 
 /**
+ * API Root Information Endpoint
+ */
+app.get(['/api', '/api/'], (req, res) => {
+  res.json({
+    name: 'SmartPill API',
+    status: 'online',
+    health: '/api/health',
+    endpoints: {
+      auth: '/api/auth',
+      medications: '/api/medications'
+    }
+  });
+});
+
+/**
  * Health Check Endpoint:
  * Used for container orchestrators, uptime monitoring, and ping testing.
  * Returns HTTP 200 when database and server are healthy, HTTP 503 when degraded.
@@ -123,23 +138,50 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+let cachedPromise = null;
+
+/**
+ * Serverless-compatible Mongoose connection with caching across invocations
+ */
+const connectToDatabase = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  if (!cachedPromise) {
+    cachedPromise = mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      autoIndex: true
+    }).catch((err) => {
+      cachedPromise = null;
+      throw err;
+    });
+  }
+
+  await cachedPromise;
+  return mongoose.connection;
+};
+
 /**
  * Database Readiness Diagnostic Middleware:
- * Provides immediate feedback if MongoDB connection is not established,
- * preventing client timeouts.
+ * Provides immediate connection attempt if not connected, and clear diagnostics.
  */
-const checkDbReady = (req, res, next) => {
+const checkDbReady = async (req, res, next) => {
   if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({
-      success: false,
-      message: 'MongoDB database is not connected. Please ensure MongoDB is running locally or specify your MongoDB Atlas connection string in backend/.env.',
-      errors: [
-        {
-          path: 'database',
-          msg: 'Database offline. Please start local MongoDB or configure MONGODB_URI in backend/.env'
-        }
-      ]
-    });
+    try {
+      await connectToDatabase();
+    } catch (err) {
+      return res.status(503).json({
+        success: false,
+        message: 'MongoDB database is not connected. Please ensure MongoDB is running locally or specify your MongoDB Atlas connection string in MONGODB_URI.',
+        errors: [
+          {
+            path: 'database',
+            msg: `Database offline: ${err.message}`
+          }
+        ]
+      });
+    }
   }
   next();
 };
@@ -296,7 +338,10 @@ const startServer = async () => {
   connectWithRetry();
 };
 
-startServer();
+// Only start standalone HTTP server when executed directly (not when required by Vercel serverless functions)
+if (require.main === module) {
+  startServer();
+}
 
 // Graceful process shutdown handling
 const gracefulShutdown = async (signal) => {
