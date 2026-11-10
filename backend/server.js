@@ -1,0 +1,320 @@
+/**
+ * ==============================================================================
+ * SmartPill Health Management System - Express Backend Server Entry Point
+ * File: backend/server.js
+ * ==============================================================================
+ * Educational Notes (BCA Viva Reference):
+ * 1. Express Application Architecture:
+ *    - Middleware Chain: Ordered pipeline through which incoming HTTP requests flow
+ *      (CORS -> cookie parsing -> JSON body parser -> routers -> 404 -> Error Handler).
+ * 2. Cross-Origin Resource Sharing (CORS):
+ *    - Configured with `credentials: true` to allow cookies to travel between frontend
+ *      (Vite dev server at http://localhost:5173) and backend (Express at http://localhost:5000).
+ * 3. Centralized Global Error Handler:
+ *    - Follows Express convention with 4 parameters: `(err, req, res, next)`.
+ *    - Catches Mongoose duplicate key errors (code 11000), validation errors, and runtime failures.
+ * 4. Graceful Shutdown & Database Lifecycle:
+ *    - Mongoose connects to MongoDB before HTTP server starts accepting traffic.
+ * ==============================================================================
+ */
+
+require('dotenv').config();
+
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const path = require('path');
+const fs = require('fs');
+
+// Import Route Handlers
+const authRoutes = require('./routes/auth');
+const medicationRoutes = require('./routes/medications');
+
+// Initialize Express Application
+const app = express();
+
+// ==============================================================================
+// 1. Environment Configurations & Constants
+// ==============================================================================
+const HOST = process.env.HOST || '127.0.0.1';
+const PORT = process.env.PORT || 5000;
+const MONGODB_URI =
+  process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/smartpill';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:5173';
+
+// ==============================================================================
+// 2. Global Middleware Pipeline
+// ==============================================================================
+
+/**
+ * CORS Configuration:
+ * Allows frontend client on IPv4 (127.0.0.1:5173) to communicate across origins
+ * while supporting credentials (secure HTTP-only session cookies & Bearer tokens).
+ */
+const allowedOrigins = [
+  FRONTEND_URL,
+  'http://127.0.0.1:5173',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://localhost:3000'
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like curl, postman) or matching dev origins
+      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://127.0.0.1:') || origin.startsWith('http://localhost:')) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  })
+);
+
+/**
+ * Cookie Parser Middleware:
+ * Parses Cookie header and populates req.cookies with an object keyed by the cookie names.
+ */
+app.use(cookieParser());
+
+/**
+ * Body Parser Middlewares:
+ * 1. express.json(): Parses incoming requests with JSON payloads (Content-Type: application/json)
+ * 2. express.urlencoded(): Parses URL-encoded form data (Content-Type: application/x-www-form-urlencoded)
+ */
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ==============================================================================
+// 3. API Routes
+// ==============================================================================
+
+/**
+ * Health Check Endpoint:
+ * Used for container orchestrators, uptime monitoring, and ping testing.
+ * Returns HTTP 200 when database and server are healthy, HTTP 503 when degraded.
+ */
+app.get('/api/health', (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const dbStatusMap = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+
+  const isHealthy = dbState === 1;
+
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'healthy' : 'degraded',
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+    database: {
+      status: dbStatusMap[dbState] || 'unknown',
+      readyState: dbState,
+      host: mongoose.connection.host || null,
+      name: mongoose.connection.name || null
+    },
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+/**
+ * Database Readiness Diagnostic Middleware:
+ * Provides immediate feedback if MongoDB connection is not established,
+ * preventing client timeouts.
+ */
+const checkDbReady = (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      message: 'MongoDB database is not connected. Please ensure MongoDB is running locally or specify your MongoDB Atlas connection string in backend/.env.',
+      errors: [
+        {
+          path: 'database',
+          msg: 'Database offline. Please start local MongoDB or configure MONGODB_URI in backend/.env'
+        }
+      ]
+    });
+  }
+  next();
+};
+
+/**
+ * Mount Authentication Router
+ * Prefix: /api/auth
+ */
+app.use('/api/auth', checkDbReady, authRoutes);
+
+/**
+ * Mount Medications & History Router
+ * Prefix: /api/medications
+ */
+app.use('/api/medications', checkDbReady, medicationRoutes);
+
+// ==============================================================================
+// 4. Static Frontend Production Build Serving (Single-Origin Architecture)
+// ==============================================================================
+const frontendDist = path.join(__dirname, '../frontend/dist');
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
+
+// ==============================================================================
+// 5. Fallback 404 Route Handler
+// ==============================================================================
+app.use((req, res, next) => {
+  res.status(404).json({
+    success: false,
+    message: `Resource not found: [${req.method}] ${req.originalUrl}`,
+    errors: [{ path: 'route', msg: 'The requested API endpoint does not exist' }]
+  });
+});
+
+// ==============================================================================
+// 5. Global Error Handling Middleware
+// ==============================================================================
+/**
+ * Express error handler with arity of 4: (err, req, res, next).
+ * Catches all synchronous and asynchronous errors forwarded via next(err).
+ */
+app.use((err, req, res, next) => {
+  console.error('Unhandled Application Error:', err);
+
+  // 1. Mongoose Duplicate Key Error (Code 11000)
+  if (err.code === 11000) {
+    const duplicateField = Object.keys(err.keyPattern || err.keyValue || {})[0] || 'field';
+    return res.status(409).json({
+      success: false,
+      message: `${duplicateField.charAt(0).toUpperCase() + duplicateField.slice(1)} already exists`,
+      errors: [
+        {
+          path: duplicateField,
+          msg: `${duplicateField} already exists in database`
+        }
+      ]
+    });
+  }
+
+  // 2. Mongoose Schema Validation Error
+  if (err.name === 'ValidationError') {
+    const formattedErrors = Object.values(err.errors || {}).map((item) => ({
+      path: item.path,
+      msg: item.message
+    }));
+
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: formattedErrors
+    });
+  }
+
+  // 3. Mongoose Invalid ObjectId Cast Error
+  if (err.name === 'CastError') {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid format for field: ${err.path}`,
+      errors: [{ path: err.path, msg: `Cast to ${err.kind} failed for value "${err.value}"` }]
+    });
+  }
+
+  // 4. Default / Internal Server Error (500)
+  const statusCode = err.statusCode || 500;
+  return res.status(statusCode).json({
+    success: false,
+    message: err.message || 'Internal Server Error',
+    errors: [
+      {
+        path: 'server',
+        msg: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message
+      }
+    ]
+  });
+});
+
+// ==============================================================================
+// 6. Database Connection & Server Bootstrap with Auto-Retry
+// ==============================================================================
+
+// Database lifecycle event handlers
+mongoose.connection.on('connected', () => {
+  console.log(`✅ MongoDB connected successfully: host=${mongoose.connection.host}, database=${mongoose.connection.name}`);
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('❌ MongoDB connection error:', err.message);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.warn('⚠️  MongoDB connection lost / disconnected. Reconnection will be attempted automatically.');
+});
+
+let isConnecting = false;
+let retryTimer = null;
+
+const connectWithRetry = async () => {
+  if (mongoose.connection.readyState === 1 || isConnecting) return;
+  isConnecting = true;
+  try {
+    console.log(`[Database] Connecting to MongoDB at ${MONGODB_URI}...`);
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 3000,
+      autoIndex: true
+    });
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+  } catch (error) {
+    console.warn(`⚠️  Notice: MongoDB connection attempt failed (${error.message}). Auto-retrying in 5 seconds...`);
+    retryTimer = setTimeout(() => {
+      isConnecting = false;
+      connectWithRetry();
+    }, 5000);
+  } finally {
+    isConnecting = false;
+  }
+};
+
+const startServer = async () => {
+  // 1. Start HTTP Server immediately so API & health check are instantly available
+  app.listen(PORT, HOST, () => {
+    console.log(`🚀 SmartPill Backend Server running on http://${HOST}:${PORT}`);
+    console.log(`📋 Health check available at http://${HOST}:${PORT}/api/health`);
+  });
+
+  // 2. Connect to MongoDB with auto-retry
+  connectWithRetry();
+};
+
+startServer();
+
+// Graceful process shutdown handling
+const gracefulShutdown = async (signal) => {
+  console.log(`\nReceived ${signal}. Gracefully shutting down...`);
+  if (retryTimer) clearTimeout(retryTimer);
+  try {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close(false);
+      console.log('MongoDB connection closed.');
+    }
+  } catch (err) {
+    console.error('Error during database teardown:', err.message);
+  }
+  process.exit(0);
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+module.exports = app;
+
