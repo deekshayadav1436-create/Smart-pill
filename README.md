@@ -1,130 +1,207 @@
-# SmartPill - Health Management System
+# SmartPill — Health Management System
 
-> **Vercel-Ready Fullstack Monorepo**  
-> Complete health management application running under **one single URL** in both cloud production (Vercel) and local development.
-
----
-
-## Single Working URL Architecture
-
-Whether deployed on **Vercel** or running **locally**, the frontend and backend operate together under **one single origin**:
-
-- **Production (Vercel)**: `https://<your-project>.vercel.app`
-  - Frontend UI: `https://<your-project>.vercel.app/`
-  - Backend API: `https://<your-project>.vercel.app/api/*` (e.g. `/api/health`, `/api/auth/login`)
-- **Local Development**: `http://127.0.0.1:5173`
-  - Frontend UI: `http://127.0.0.1:5173/`
-  - Backend API: `http://127.0.0.1:5173/api/*` (auto-proxied via Vite to internal Express server)
+> **Vercel-Ready Full-Stack Monorepo**  
+> React 19 frontend + Express/MongoDB backend running under **one single URL** — both locally and on Vercel.
 
 ---
 
-## Monorepo Project Structure
+## Single URL Architecture
 
-```text
-Smart-pill/
+| Environment | URL | Frontend | Backend API |
+|---|---|---|---|
+| **Local Dev** | `http://127.0.0.1:5173` | `http://127.0.0.1:5173/` | `http://127.0.0.1:5173/api/*` (proxied by Vite → Express on port 5000) |
+| **Production** | `https://<your-project>.vercel.app` | `https://<your-project>.vercel.app/` | `https://<your-project>.vercel.app/api/*` (Vercel Serverless Function) |
+
+---
+
+## Project Structure
+
+```
+Smart-pill/                       ← Vercel project root
 ├── api/
-│   └── index.js             # Vercel Serverless Function entry point (bridges Express app)
+│   └── index.js                  # Vercel Serverless Function — exports Express app
 ├── backend/
 │   ├── middleware/
-│   │   └── auth.js          # JWT authentication middleware
+│   │   └── auth.js               # JWT authentication middleware
 │   ├── models/
-│   │   ├── Medication.js    # Mongoose active & past medication schema
-│   │   └── User.js          # Mongoose user model with bcrypt hashing
+│   │   ├── Medication.js         # Mongoose medication schema
+│   │   └── User.js               # Mongoose user schema (bcrypt hashing)
 │   ├── routes/
-│   │   ├── auth.js          # Authentication routes (/api/auth)
-│   │   └── medications.js   # Medication CRUD & history routes (/api/medications)
-│   ├── .env.example         # Backend environment template
-│   ├── package.json         # Backend dependencies
-│   └── server.js            # Dual-mode Express server (Serverless + standalone listener)
+│   │   ├── auth.js               # Auth routes: /api/auth/*
+│   │   └── medications.js        # Medication CRUD: /api/medications/*
+│   ├── .env.example              # Backend environment variable template
+│   ├── package.json              # Backend dependencies
+│   └── server.js                 # Express app (serverless-compatible export)
 ├── frontend/
-│   ├── public/              # Static public assets (favicons, SVG icons)
+│   ├── public/                   # Static assets (favicon, icons)
 │   ├── src/
-│   │   ├── components/      # AuthPage, MedicationHistoryView, MedicationsView, etc.
-│   │   ├── App.jsx          # Root application routing and state management
-│   │   ├── App.css          # Healthcare UI theme
-│   │   └── main.jsx         # React 19 entry point
-│   ├── .env.example         # Frontend environment template
-│   ├── .gitignore           # Frontend local gitignore
-│   ├── index.html           # HTML shell
-│   ├── package.json         # Frontend dependencies
-│   └── vite.config.js       # Vite configuration with /api reverse proxy
-├── .gitignore               # Root gitignore (excludes node_modules, build outputs, real .env)
-├── package.json             # Root orchestration with npm workspaces
-├── package-lock.json
-├── vercel.json              # Vercel deployment specification (build & API rewrites)
-├── README.md                # Project documentation & deployment guide
-├── install.bat              # 1-Click Windows dependency installer
-└── start.bat                # 1-Click Windows local runner
+│   │   ├── components/           # AuthPage, MedicationsView, etc.
+│   │   ├── App.jsx               # Root component & state management
+│   │   ├── App.css               # Healthcare UI theme
+│   │   └── main.jsx              # React 19 entry point
+│   ├── .env.example              # Frontend environment variable template
+│   ├── index.html                # HTML shell
+│   ├── package.json              # Frontend dependencies
+│   └── vite.config.js            # Vite + /api proxy for local dev
+├── .gitignore                    # Excludes node_modules, dist, .env secrets
+├── package.json                  # Root orchestration (npm workspaces)
+├── vercel.json                   # Vercel build & rewrite configuration
+├── install.bat                   # Windows: 1-click dependency installer
+└── start.bat                     # Windows: 1-click local dev starter
 ```
-
----
-
-## How to Run Locally
-
-### Prerequisites
-- **Node.js**: v18.0.0 or higher
-- **MongoDB**: Local MongoDB service (`net start MongoDB`) or a cloud MongoDB Atlas connection URI
-
-### Quick Start (Windows)
-1. Double-click **`install.bat`** (or run `npm run install:all` in terminal).
-2. Double-click **`start.bat`** (or run `npm run dev` in terminal).
-3. Open your browser at **`http://127.0.0.1:5173`**.
-
----
-
-## How to Deploy to Vercel (Step-by-Step)
-
-This repository is pre-configured with `vercel.json` and `api/index.js` for single-click Vercel deployment.
-
-### Step 1: Push Repository to GitHub
-Ensure all code is committed and pushed to your GitHub repository on branch `main`.
-
-### Step 2: Import into Vercel
-1. Log in to your [Vercel Dashboard](https://vercel.com/dashboard).
-2. Click **Add New...** -> **Project**.
-3. Select your repository: `Smart-pill` and click **Import**.
-
-### Step 3: Project Configuration
-Vercel will automatically read `vercel.json`. Verify the following settings:
-- **Framework Preset**: `Vite` (or `Other`)
-- **Root Directory**: `./` (leave default repository root)
-- **Build Command**: `npm run build`
-- **Output Directory**: `frontend/dist`
-
-### Step 4: Configure Environment Variables
-In the **Environment Variables** section of the Vercel project settings, add:
-
-| Variable Name | Required | Description / Example |
-| :--- | :--- | :--- |
-| `MONGODB_URI` | **Yes** | Your cloud MongoDB Atlas connection string, e.g.: `mongodb+srv://<username>:<password>@cluster0.mongodb.net/smartpill?retryWrites=true&w=majority` |
-| `JWT_SECRET` | **Yes** | A strong random string for signing JWT authentication tokens |
-| `JWT_EXPIRES_IN` | No | Token lifetime (Default: `7d`) |
-| `NODE_ENV` | No | Set to `production` |
-
-> Note on MongoDB: Vercel functions execute in the cloud and cannot connect to `127.0.0.1` (localhost). A free [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) cluster is recommended for production.
-
-### Step 5: Click Deploy
-Click **Deploy**. Once built, Vercel will provide your unified URL (e.g. `https://smart-pill.vercel.app`).
-
----
-
-## System Health & Diagnostic Endpoints
-
-- **Root API Status**: `GET /api`
-  ```json
-  {
-    "name": "SmartPill API",
-    "status": "online",
-    "health": "/api/health"
-  }
-  ```
-- **Database Diagnostic Check**: `GET /api/health`
-  Returns HTTP 200 with MongoDB host and connection status, or HTTP 503 with setup instructions if MongoDB Atlas credentials are not yet configured.
 
 ---
 
 ## Tech Stack
 
-- **Frontend**: React 19, Vite 6, Modern CSS
-- **Backend**: Node.js, Express 4.21, Mongoose 8.6, JSON Web Tokens (JWT), Bcrypt.js
-- **Deployment**: Vercel Serverless Functions (`@vercel/node`) + Vercel Edge Static CDN
+| Layer | Technology |
+|---|---|
+| **Frontend** | React 19, Vite 8, Modern CSS |
+| **Backend** | Node.js ≥20, Express 4.21, Mongoose 8.6 |
+| **Auth** | JSON Web Tokens (JWT) + HttpOnly cookies + bcrypt |
+| **Database** | MongoDB (local for dev, MongoDB Atlas for production) |
+| **Deployment** | Vercel Serverless Functions + Vercel Edge CDN |
+
+---
+
+## Running Locally
+
+### Prerequisites
+
+- **Node.js** v20 or higher — [nodejs.org](https://nodejs.org)
+- **MongoDB** — either:
+  - Local: install [MongoDB Community Server](https://www.mongodb.com/try/download/community) and start it (`mongod`)
+  - Cloud: a free [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) cluster (also works for local dev)
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+This installs all workspace packages (root + `frontend/` + `backend/`) in one command.
+
+### 2. Configure Environment Variables
+
+```bash
+# Backend
+cp backend/.env.example backend/.env
+# Edit backend/.env — set MONGODB_URI and JWT_SECRET at minimum
+```
+
+The frontend needs no `.env` file for local dev — the Vite proxy handles `/api` routing automatically.
+
+### 3. Start Both Servers
+
+```bash
+npm run dev
+```
+
+This concurrently starts:
+- **Backend** Express server on `http://127.0.0.1:5000`
+- **Frontend** Vite dev server on `http://127.0.0.1:5173`
+
+Open your browser at **`http://127.0.0.1:5173`**.
+
+### Windows Quick Start
+
+Double-click **`install.bat`** then **`start.bat`**.
+
+---
+
+## API Diagnostic Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api` | API info & available routes |
+| `GET` | `/api/health` | Server + MongoDB status (HTTP 200 = healthy, 503 = DB offline) |
+| `POST` | `/api/auth/register` | Register new user |
+| `POST` | `/api/auth/login` | Login (returns JWT cookie + token) |
+| `GET` | `/api/auth/me` | Get current user (requires auth) |
+| `POST` | `/api/auth/logout` | Clear session cookie |
+| `GET` | `/api/medications` | List medications (requires auth) |
+| `POST` | `/api/medications` | Add medication (requires auth) |
+| `PUT` | `/api/medications/:id` | Update medication (requires auth) |
+| `DELETE` | `/api/medications/:id` | Delete medication (requires auth) |
+
+---
+
+## Deploying to Vercel
+
+This repository is pre-configured for one-click Vercel deployment via `vercel.json`.
+
+### Step 1 — Push to GitHub
+
+Ensure all your changes are committed and pushed to the `main` branch.
+
+### Step 2 — Import into Vercel
+
+1. Go to [vercel.com/dashboard](https://vercel.com/dashboard)
+2. Click **Add New… → Project**
+3. Select your `Smart-pill` GitHub repository and click **Import**
+
+### Step 3 — Vercel Project Settings
+
+Vercel reads `vercel.json` automatically. Confirm or manually set:
+
+| Setting | Value |
+|---|---|
+| **Framework Preset** | `Other` |
+| **Root Directory** | `.` (repository root — leave default) |
+| **Install Command** | `npm install` |
+| **Build Command** | `npm run build` |
+| **Output Directory** | `frontend/dist` |
+
+### Step 4 — Set Environment Variables
+
+In **Project Settings → Environment Variables**, add:
+
+| Variable | Required | Value / Example |
+|---|---|---|
+| `MONGODB_URI` | ✅ **Yes** | `mongodb+srv://<user>:<password>@cluster.mongodb.net/smartpill?retryWrites=true&w=majority` |
+| `JWT_SECRET` | ✅ **Yes** | A strong random string — generate: `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` |
+| `NODE_ENV` | ✅ Recommended | `production` |
+| `JWT_EXPIRES_IN` | No | `7d` (default) |
+| `FRONTEND_URL` | No | `https://your-project-name.vercel.app` (used for CORS — only needed if requests fail) |
+
+> **MongoDB Note:** Vercel Serverless Functions run in the cloud and **cannot** connect to `localhost` MongoDB. You must use a [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) free-tier cluster for production.
+
+### Step 5 — Deploy
+
+Click **Deploy**. After ~1–2 minutes your app will be live at a URL like:
+
+```
+https://smart-pill-abc123.vercel.app
+```
+
+### Expected URL Behavior After Deploy
+
+```
+https://your-project.vercel.app/                    → React SPA (login/dashboard)
+https://your-project.vercel.app/api                 → { "name": "SmartPill API", "status": "online" }
+https://your-project.vercel.app/api/health          → DB connection status JSON
+https://your-project.vercel.app/api/auth/register   → User registration
+https://your-project.vercel.app/api/auth/login      → Authentication
+https://your-project.vercel.app/api/medications     → Medication CRUD (requires login)
+```
+
+---
+
+## Backend on Vercel — Architecture Note
+
+The backend runs as a **Vercel Serverless Function** via `api/index.js`. It does **not** need a separate hosting provider. Here's how it works:
+
+```
+Vercel Request → api/index.js (Serverless Entry) → backend/server.js (Express App)
+                                                  ↓
+                                            MongoDB Atlas
+```
+
+- `backend/server.js` exports `app` and only calls `app.listen()` when run as a standalone Node process (local dev).
+- On Vercel, `api/index.js` imports the app and Vercel handles the HTTP layer — `app.listen()` is never called in production.
+
+---
+
+## Offline / Degraded Mode
+
+The frontend has a graceful offline fallback — if the backend is unreachable, medications are stored and read from `localStorage`. Users see their data immediately; it syncs to the database once connectivity is restored.
