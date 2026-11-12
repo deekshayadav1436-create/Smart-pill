@@ -39,10 +39,9 @@ const app = express();
 // ==============================================================================
 const HOST = process.env.HOST || '127.0.0.1';
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI = (
-  process.env.MONGODB_URI ||
-  'mongodb+srv://deekshayadav1436_db_user:WTiGZKUkG0BY7ZEv@cluster0.stit6d7.mongodb.net/smartpill?retryWrites=true&w=majority'
-).trim().replace(/^\u2028/, '');
+const MONGODB_URI = process.env.MONGODB_URI
+  ? process.env.MONGODB_URI.trim().replace(/^\u2028/, '')
+  : 'mongodb://127.0.0.1:27017/smartpill';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:5173';
 
 // ==============================================================================
