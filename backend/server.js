@@ -63,8 +63,14 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like curl, postman) or matching dev origins
-      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://127.0.0.1:') || origin.startsWith('http://localhost:')) {
+      // Allow requests with no origin (curl, postman) or matching allowed/dev/vercel origins
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.startsWith('http://127.0.0.1:') ||
+        origin.startsWith('http://localhost:') ||
+        origin.endsWith('.vercel.app')
+      ) {
         return callback(null, true);
       }
       return callback(null, true);
@@ -108,12 +114,44 @@ app.get(['/api', '/api/'], (req, res) => {
   });
 });
 
+let cachedPromise = null;
+
+/**
+ * Serverless-compatible Mongoose connection with caching across invocations
+ */
+const connectToDatabase = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  if (!cachedPromise || mongoose.connection.readyState === 0) {
+    cachedPromise = mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      autoIndex: true
+    }).catch((err) => {
+      cachedPromise = null;
+      throw err;
+    });
+  }
+
+  await cachedPromise;
+  return mongoose.connection;
+};
+
 /**
  * Health Check Endpoint:
  * Used for container orchestrators, uptime monitoring, and ping testing.
  * Returns HTTP 200 when database and server are healthy, HTTP 503 when degraded.
  */
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  if (mongoose.connection.readyState !== 1 && process.env.MONGODB_URI) {
+    try {
+      await connectToDatabase();
+    } catch (err) {
+      // Degraded response will report error details below
+    }
+  }
+
   const dbState = mongoose.connection.readyState;
   const dbStatusMap = {
     0: 'disconnected',
@@ -137,30 +175,6 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development'
   });
 });
-
-let cachedPromise = null;
-
-/**
- * Serverless-compatible Mongoose connection with caching across invocations
- */
-const connectToDatabase = async () => {
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection;
-  }
-
-  if (!cachedPromise) {
-    cachedPromise = mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      autoIndex: true
-    }).catch((err) => {
-      cachedPromise = null;
-      throw err;
-    });
-  }
-
-  await cachedPromise;
-  return mongoose.connection;
-};
 
 /**
  * Database Readiness Diagnostic Middleware:
