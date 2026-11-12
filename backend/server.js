@@ -114,41 +114,75 @@ app.get(['/api', '/api/'], (req, res) => {
   });
 });
 
-let cachedPromise = null;
+// Module-level cache so the promise persists across serverless warm invocations.
+// Using global ensures the value survives across require() calls in the same Lambda.
+let cachedPromise = global._mongoosePromise || null;
 
 /**
- * Serverless-compatible Mongoose connection with caching across invocations
+ * Serverless-compatible Mongoose connection with module-level caching.
+ *
+ * On Vercel/Lambda the Node.js process can be reused across requests (warm start).
+ * We store the connection promise in the module scope so a second concurrent
+ * request joins the same in-flight connect() rather than opening a new one.
+ *
+ * Key options for MongoDB Atlas:
+ *   - serverSelectionTimeoutMS: how long to wait for a suitable server (10s)
+ *   - connectTimeoutMS: socket-level connect timeout (10s)
+ *   - bufferCommands: false → queries fail fast instead of queuing indefinitely
+ *   - maxPoolSize: keep pool small for serverless to avoid Atlas free-tier limits
  */
 const connectToDatabase = async () => {
+  // 1. Already fully connected — reuse immediately.
   if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
 
-  if (!cachedPromise || mongoose.connection.readyState === 0) {
-    cachedPromise = mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      autoIndex: true
-    }).catch((err) => {
-      cachedPromise = null;
-      throw err;
-    });
+  // 2. A connection is in progress — await the shared promise.
+  if (cachedPromise && mongoose.connection.readyState !== 0) {
+    await cachedPromise;
+    return mongoose.connection;
   }
+
+  // 3. No active connection — start a new one and cache the promise.
+  cachedPromise = mongoose.connect(MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000,  // 10 s — give Atlas time to wake up
+    connectTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+    bufferCommands: false,            // fail fast — don't queue commands
+    maxPoolSize: 10,
+    minPoolSize: 1,
+    autoIndex: true
+  }).then((conn) => {
+    global._mongoosePromise = cachedPromise;
+    return conn.connection;
+  }).catch((err) => {
+    // Reset so the next request can try again.
+    cachedPromise = null;
+    global._mongoosePromise = null;
+    console.error('[DB] Connection failed:', err.message);
+    throw err;
+  });
 
   await cachedPromise;
   return mongoose.connection;
 };
 
+
 /**
  * Health Check Endpoint:
  * Used for container orchestrators, uptime monitoring, and ping testing.
  * Returns HTTP 200 when database and server are healthy, HTTP 503 when degraded.
+ *
+ * KEY FIX: Always attempt DB connection on health check — this ensures the
+ * connection is established immediately on first request (Vercel cold start).
  */
 app.get('/api/health', async (req, res) => {
-  if (mongoose.connection.readyState !== 1 && process.env.MONGODB_URI) {
+  let connectError = null;
+  if (mongoose.connection.readyState !== 1) {
     try {
       await connectToDatabase();
     } catch (err) {
-      // Degraded response will report error details below
+      connectError = err;
     }
   }
 
@@ -170,9 +204,11 @@ app.get('/api/health', async (req, res) => {
       status: dbStatusMap[dbState] || 'unknown',
       readyState: dbState,
       host: mongoose.connection.host || null,
-      name: mongoose.connection.name || null
+      name: mongoose.connection.name || null,
+      error: connectError ? connectError.message : null
     },
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    mongoUri: MONGODB_URI ? MONGODB_URI.replace(/:\/\/[^@]+@/, '://<credentials>@') : 'not set'
   });
 });
 
@@ -375,5 +411,8 @@ const gracefulShutdown = async (signal) => {
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
+// Export the Express app as the default export (used by Vercel serverless handler in api/index.js)
+// Also export connectToDatabase so api/index.js can eagerly warm the DB on every cold start.
 module.exports = app;
+module.exports.connectToDatabase = connectToDatabase;
 
