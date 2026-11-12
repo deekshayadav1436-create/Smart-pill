@@ -260,13 +260,20 @@ const checkDbReady = async (req, res, next) => {
     try {
       await connectToDatabase();
     } catch (err) {
+      const isCloudEnv = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+      const isLocalhostUri = !process.env.MONGODB_URI || process.env.MONGODB_URI.includes('127.0.0.1') || process.env.MONGODB_URI.includes('localhost');
+      
+      const errorMsg = (isCloudEnv && isLocalhostUri)
+        ? 'Database offline: MONGODB_URI environment variable is not configured in Vercel. Please add your MongoDB Atlas connection string (mongodb+srv://...) in Vercel Project Settings -> Environment Variables.'
+        : `Database offline: ${err.message}`;
+
       return res.status(503).json({
         success: false,
-        message: 'MongoDB database is not connected. Please ensure MongoDB is running locally or specify your MongoDB Atlas connection string in MONGODB_URI.',
+        message: errorMsg,
         errors: [
           {
             path: 'database',
-            msg: `Database offline: ${err.message}`
+            msg: errorMsg
           }
         ]
       });
