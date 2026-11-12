@@ -17,7 +17,7 @@
     "install:all": "npm install",
     "build:frontend": "npm run build --prefix frontend",
     "build:backend": "npm run build --prefix backend",
-    "build": "npm run build --prefix frontend"
+    "build": "node build.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
