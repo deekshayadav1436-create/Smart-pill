@@ -18,7 +18,7 @@
  * Design: Matches the existing SmartPill blue-and-white healthcare theme.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // In development, Vite reverse-proxies /api to the backend, enabling a single URL (http://127.0.0.1:5173)
 const API_URL = import.meta.env.VITE_API_URL || "";
@@ -26,6 +26,33 @@ const API_URL = import.meta.env.VITE_API_URL || "";
 function AuthPage({ onLoginSuccess }) {
   // ─── Tab State ──────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("signin"); // "signin" | "register"
+
+  // ─── Database health status ──────────────────────────────────
+  // "checking" | "online" | "offline"
+  const [dbStatus, setDbStatus] = useState("checking");
+
+  // On mount: ping /api/health to detect if DB is configured and connected
+  useEffect(() => {
+    const checkDbHealth = async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout
+        const res = await fetch(`${API_URL}/api/health`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        const data = await res.json();
+        if (data?.database?.status === "connected") {
+          setDbStatus("online");
+        } else {
+          setDbStatus("offline");
+        }
+      } catch (err) {
+        setDbStatus("offline");
+      }
+    };
+    checkDbHealth();
+  }, []);
 
   // ─── Sign In Form State ─────────────────────────────────────
   const [loginData, setLoginData] = useState({
@@ -296,6 +323,69 @@ function AuthPage({ onLoginSuccess }) {
             <span>Health Management System</span>
           </div>
         </div>
+
+        {/* DB Status Banner */}
+        {dbStatus === "checking" && (
+          <div style={{
+            background: "#f0f4ff", border: "1px solid #c3d0f0",
+            borderRadius: "8px", padding: "10px 14px", marginBottom: "12px",
+            fontSize: "13px", color: "#4a6fa5", display: "flex",
+            alignItems: "center", gap: "8px"
+          }}>
+            <span style={{ fontSize: "16px" }}>⏳</span>
+            <span>Connecting to database…</span>
+          </div>
+        )}
+        {dbStatus === "online" && (
+          <div style={{
+            background: "#f0faf4", border: "1px solid #a8d5b5",
+            borderRadius: "8px", padding: "10px 14px", marginBottom: "12px",
+            fontSize: "13px", color: "#2e7d52", display: "flex",
+            alignItems: "center", gap: "8px"
+          }}>
+            <span style={{ fontSize: "16px" }}>✅</span>
+            <span>Database connected — ready to use.</span>
+          </div>
+        )}
+        {dbStatus === "offline" && (
+          <div style={{
+            background: "#fff8f0", border: "1px solid #f5c6a0",
+            borderRadius: "10px", padding: "14px 16px", marginBottom: "16px",
+            fontSize: "13px", color: "#7a3a00"
+          }}>
+            <div style={{ fontWeight: "700", fontSize: "14px", marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>⚠️</span> Database Not Connected
+            </div>
+            <p style={{ margin: "0 0 10px 0", lineHeight: "1.5" }}>
+              The database is offline. This is because{" "}
+              <strong>MONGODB_URI</strong> is not set in your Vercel project settings.
+            </p>
+            <p style={{ margin: "0 0 10px 0", lineHeight: "1.5", fontWeight: "600" }}>
+              Fix in 2 minutes:
+            </p>
+            <ol style={{ margin: "0 0 10px 0", paddingLeft: "20px", lineHeight: "1.8" }}>
+              <li>Go to <a href="https://www.mongodb.com/atlas" target="_blank" rel="noopener noreferrer" style={{ color: "#1a73e8" }}>mongodb.com/atlas</a> → create a <strong>free M0 cluster</strong></li>
+              <li>Create a database user, set Network Access → <strong>0.0.0.0/0</strong></li>
+              <li>Copy the connection string: <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>mongodb+srv://user:pass@cluster.mongodb.net/smartpill</code></li>
+              <li>Go to your <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: "#1a73e8" }}>Vercel Dashboard</a> → Project → <strong>Settings → Environment Variables</strong></li>
+              <li>Add: <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>MONGODB_URI</code> = your Atlas connection string</li>
+              <li>Also add: <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>JWT_SECRET</code> = any random 32+ char string</li>
+              <li>Also add: <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>NODE_ENV</code> = <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>production</code></li>
+              <li><strong>Redeploy</strong> in Vercel (Deployments → ⋯ → Redeploy)</li>
+            </ol>
+            <button
+              type="button"
+              onClick={() => { setDbStatus("checking"); fetch(`${API_URL}/api/health`).then(r => r.json()).then(d => setDbStatus(d?.database?.status === "connected" ? "online" : "offline")).catch(() => setDbStatus("offline")); }}
+              style={{
+                background: "#e8703a", color: "white", border: "none",
+                borderRadius: "6px", padding: "7px 14px", fontSize: "12px",
+                cursor: "pointer", fontWeight: "600"
+              }}
+            >
+              🔄 Retry Connection
+            </button>
+          </div>
+        )}
 
         {/* Tab Switcher */}
         <div className="auth-tab-switch">
