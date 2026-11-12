@@ -107,10 +107,49 @@ app.get(['/api', '/api/'], (req, res) => {
     name: 'SmartPill API',
     status: 'online',
     health: '/api/health',
+    setup: '/api/setup-check',
     endpoints: {
       auth: '/api/auth',
       medications: '/api/medications'
     }
+  });
+});
+
+/**
+ * Setup Diagnostic Endpoint:
+ * Checks if all required environment variables are configured.
+ * Safe to expose — never shows actual secret values.
+ */
+app.get('/api/setup-check', (req, res) => {
+  const mongoUri = process.env.MONGODB_URI;
+  const jwtSecret = process.env.JWT_SECRET;
+  const nodeEnv = process.env.NODE_ENV;
+
+  const isAtlasUri = mongoUri && mongoUri.startsWith('mongodb+srv://');
+  const isLocalUri = mongoUri && mongoUri.includes('127.0.0.1');
+
+  const issues = [];
+  if (!mongoUri) {
+    issues.push('MONGODB_URI is not set — the database cannot connect. Add a MongoDB Atlas URI in Vercel Project Settings → Environment Variables.');
+  } else if (isLocalUri) {
+    issues.push('MONGODB_URI is set to a local address (127.0.0.1) which is unreachable from Vercel. Replace it with a MongoDB Atlas URI (mongodb+srv://...).');
+  }
+  if (!jwtSecret) {
+    issues.push('JWT_SECRET is not set — authentication will use an insecure fallback. Set a strong random string in Vercel env vars.');
+  }
+
+  res.status(issues.length > 0 ? 400 : 200).json({
+    configured: issues.length === 0,
+    issues,
+    env: {
+      MONGODB_URI: !mongoUri ? '❌ NOT SET' : (isLocalUri ? '⚠️ LOCAL ADDRESS — will not work on Vercel' : (isAtlasUri ? '✅ Atlas URI configured' : '⚠️ Set but not an Atlas URI')),
+      JWT_SECRET: !jwtSecret ? '❌ NOT SET' : '✅ Set',
+      NODE_ENV: nodeEnv || '⚠️ Not set (defaults to development)',
+    },
+    action: issues.length > 0
+      ? 'Go to Vercel Dashboard → Your Project → Settings → Environment Variables and add MONGODB_URI (MongoDB Atlas URI), JWT_SECRET, and NODE_ENV=production. Then Redeploy.'
+      : 'All required environment variables are configured. If database is still offline, check MongoDB Atlas Network Access settings (allow 0.0.0.0/0).',
+    guide: 'https://github.com/deekshayadav1436-create/Smart-pill/blob/main/SETUP_GUIDE.md'
   });
 });
 
