@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { loginUser, registerUser, DEFAULT_USERS } from "../utils/storage";
+// Authentication now handled via API; local storage utilities removed
 
 function AuthView({ onLoginSuccess }) {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -18,7 +18,7 @@ function AuthView({ onLoginSuccess }) {
     setSuccessMessage("");
   };
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage("");
     setSuccessMessage("");
@@ -37,11 +37,24 @@ function AuthView({ onLoginSuccess }) {
         return;
       }
 
-      const result = registerUser({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-      });
+      const response = await fetch('/api/auth/register', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    name: formData.name,
+    email: formData.email,
+    password: formData.password,
+  }),
+});
+const data = await response.json();
+if (response.ok) {
+  setSuccessMessage('Account created successfully! Logging you in...');
+  setTimeout(() => {
+    onLoginSuccess(data.user);
+  }, 300);
+} else {
+  setErrorMessage(data.message || 'Registration failed');
+}
 
       if (result.success) {
         setSuccessMessage("Account created successfully! Logging you in...");
@@ -57,21 +70,24 @@ function AuthView({ onLoginSuccess }) {
         return;
       }
 
-      const result = loginUser(formData.email, formData.password);
-      if (result.success) {
-        onLoginSuccess(result.user);
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        onLoginSuccess(data.user);
       } else {
-        setErrorMessage(result.message);
+        setErrorMessage(data.message || 'Login failed');
       }
     }
   };
 
-  const handleQuickDemoLogin = (user) => {
-    const result = loginUser(user.email, user.password);
-    if (result.success) {
-      onLoginSuccess(result.user);
-    }
-  };
+
 
   return (
     <div className="auth-container">
@@ -190,32 +206,7 @@ function AuthView({ onLoginSuccess }) {
           </button>
         </form>
 
-        {/* DEMO ACCOUNTS QUICK LOGIN (VIVA HELPER) */}
-        {!isSignUp && (
-          <div className="demo-accounts-box">
-            <span className="demo-badge-title">Quick Demo Login (For Viva Examination)</span>
-            <p>Select any registered demo patient to inspect isolated records:</p>
-            <div className="demo-buttons-group">
-              {DEFAULT_USERS.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  className="demo-user-btn"
-                  onClick={() => handleQuickDemoLogin(user)}
-                >
-                  <span className="demo-avatar">
-                    {user.name.split(" ")[0].charAt(0)}
-                  </span>
-                  <div className="demo-user-info">
-                    <strong>{user.name}</strong>
-                    <small>{user.patientId} • {user.email}</small>
-                  </div>
-                  <span className="demo-arrow">→</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+
 
         <div className="auth-footer-note">
           <small>
