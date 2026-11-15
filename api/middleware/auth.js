@@ -17,7 +17,7 @@
  */
 
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { findById } = require('../models/User');
 
 /**
  * Authentication Middleware:
@@ -56,7 +56,7 @@ const authenticate = async (req, res, next) => {
     );
 
     // Fetch user from database to ensure user still exists and hasn't been deleted
-    const user = await User.findById(decoded.id);
+    const user = await findById(decoded.id);
     if (!user) {
       return res.status(401).json({
         success: false,

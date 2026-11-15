@@ -21,7 +21,7 @@
 require('dotenv').config();
 
 const express = require('express');
-const mongoose = require('mongoose');
+const { Pool } = require('pg');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
@@ -39,8 +39,7 @@ const app = express();
 // ==============================================================================
 const HOST = process.env.HOST || '127.0.0.1';
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI =
-  process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/smartpill';
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://localhost:5432/smartpill';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:5173';
 
 // ==============================================================================
@@ -113,90 +112,40 @@ app.get(['/api', '/api/'], (req, res) => {
  * Used for container orchestrators, uptime monitoring, and ping testing.
  * Returns HTTP 200 when database and server are healthy, HTTP 503 when degraded.
  */
-app.get('/api/health', (req, res) => {
-  const dbState = mongoose.connection.readyState;
-  const dbStatusMap = {
-    0: 'disconnected',
-    1: 'connected',
-    2: 'connecting',
-    3: 'disconnecting'
-  };
-
-  const isHealthy = dbState === 1;
-
-  res.status(isHealthy ? 200 : 503).json({
-    status: isHealthy ? 'healthy' : 'degraded',
-    timestamp: new Date().toISOString(),
-    uptimeSeconds: Math.floor(process.uptime()),
-    database: {
-      status: dbStatusMap[dbState] || 'unknown',
-      readyState: dbState,
-      host: mongoose.connection.host || null,
-      name: mongoose.connection.name || null
-    },
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
-
-let cachedPromise = null;
-
-/**
- * Serverless-compatible Mongoose connection with caching across invocations
- */
-const connectToDatabase = async () => {
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection;
-  }
-
-  if (!cachedPromise) {
-    cachedPromise = mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      autoIndex: true
-    }).catch((err) => {
-      cachedPromise = null;
-      throw err;
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.status(200).json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      database: { status: 'connected' },
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'degraded',
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      database: { status: 'disconnected', error: err.message },
+      environment: process.env.NODE_ENV || 'development'
     });
   }
+});
 
-  await cachedPromise;
-  return mongoose.connection;
-};
 
-/**
- * Database Readiness Diagnostic Middleware:
- * Provides immediate connection attempt if not connected, and clear diagnostics.
- */
-const checkDbReady = async (req, res, next) => {
-  if (mongoose.connection.readyState !== 1) {
-    try {
-      await connectToDatabase();
-    } catch (err) {
-      return res.status(503).json({
-        success: false,
-        message: 'MongoDB database is not connected. Please ensure MongoDB is running locally or specify your MongoDB Atlas connection string in MONGODB_URI.',
-        errors: [
-          {
-            path: 'database',
-            msg: `Database offline: ${err.message}`
-          }
-        ]
-      });
-    }
-  }
-  next();
-};
 
 /**
  * Mount Authentication Router
  * Prefix: /api/auth
  */
-app.use('/api/auth', checkDbReady, authRoutes);
+app.use('/api/auth', authRoutes);
 
 /**
  * Mount Medications & History Router
  * Prefix: /api/medications
  */
-app.use('/api/medications', checkDbReady, medicationRoutes);
+app.use('/api/medications', medicationRoutes);
 
 // ==============================================================================
 // 4. Static Frontend Production Build Serving (Single-Origin Architecture)
@@ -288,78 +237,52 @@ app.use((err, req, res, next) => {
 // ==============================================================================
 
 // Database lifecycle event handlers
-mongoose.connection.on('connected', () => {
-  console.log(`✅ MongoDB connected successfully: host=${mongoose.connection.host}, database=${mongoose.connection.name}`);
+
+// =============================================================================
+// PostgreSQL Connection & Server Bootstrap
+// =============================================================================
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
-mongoose.connection.on('error', (err) => {
-  console.error('❌ MongoDB connection error:', err.message);
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️  MongoDB connection lost / disconnected. Reconnection will be attempted automatically.');
-});
-
-let isConnecting = false;
-let retryTimer = null;
-
-const connectWithRetry = async () => {
-  if (mongoose.connection.readyState === 1 || isConnecting) return;
-  isConnecting = true;
+const testDbConnection = async () => {
   try {
-    console.log(`[Database] Connecting to MongoDB at ${MONGODB_URI}...`);
-    await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 3000,
-      autoIndex: true
-    });
-    if (retryTimer) {
-      clearTimeout(retryTimer);
-      retryTimer = null;
-    }
-  } catch (error) {
-    console.warn(`⚠️  Notice: MongoDB connection attempt failed (${error.message}). Auto-retrying in 5 seconds...`);
-    retryTimer = setTimeout(() => {
-      isConnecting = false;
-      connectWithRetry();
-    }, 5000);
-  } finally {
-    isConnecting = false;
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
+    console.log('✅ PostgreSQL connected successfully');
+  } catch (err) {
+    console.error('❌ PostgreSQL connection error:', err.message);
   }
 };
 
 const startServer = async () => {
-  // 1. Start HTTP Server immediately so API & health check are instantly available
   app.listen(PORT, HOST, () => {
     console.log(`🚀 SmartPill Backend Server running on http://${HOST}:${PORT}`);
     console.log(`📋 Health check available at http://${HOST}:${PORT}/api/health`);
   });
-
-  // 2. Connect to MongoDB with auto-retry
-  connectWithRetry();
+  await testDbConnection();
 };
 
-// Only start standalone HTTP server when executed directly (not when required by Vercel serverless functions)
 if (require.main === module) {
   startServer();
 }
 
-// Graceful process shutdown handling
+// Graceful shutdown handling for PostgreSQL pool
 const gracefulShutdown = async (signal) => {
   console.log(`\nReceived ${signal}. Gracefully shutting down...`);
-  if (retryTimer) clearTimeout(retryTimer);
   try {
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close(false);
-      console.log('MongoDB connection closed.');
-    }
+    await pool.end();
+    console.log('PostgreSQL pool has ended.');
   } catch (err) {
-    console.error('Error during database teardown:', err.message);
+    console.error('Error during PostgreSQL pool shutdown:', err.message);
   }
   process.exit(0);
 };
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-
-module.exports = app;
 
