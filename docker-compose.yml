@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: smartpill-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: smartpill
+      POSTGRES_PASSWORD: smartpill123
+      POSTGRES_DB: smartpill
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartpill -d smartpill"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    container_name: smartpill-api
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    env_file:
+      - ./api/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 5000
+      DATABASE_URL: postgres://smartpill:smartpill123@postgres:5432/smartpill
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
