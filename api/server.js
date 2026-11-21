@@ -30,6 +30,7 @@ const fs = require('fs');
 // Import Route Handlers
 const authRoutes = require('./routes/auth');
 const medicationRoutes = require('./routes/medications');
+const featureRoutes = require('./routes/features');
 
 // Initialize Express Application
 const app = express();
@@ -146,6 +147,7 @@ app.use('/api/auth', authRoutes);
  * Prefix: /api/medications
  */
 app.use('/api/medications', medicationRoutes);
+app.use('/api', featureRoutes);
 
 // ==============================================================================
 // 4. Static Frontend Production Build Serving (Single-Origin Architecture)

@@ -43,7 +43,7 @@ button {
 .sidebar {
   width: 260px;
   min-height: 100vh;
-  background: #ffffff;
+  background: #f5f7fb;
   border-right: 1px solid #e7ebf2;
   display: flex;
   flex-direction: column;
@@ -68,7 +68,7 @@ button {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  background: #2563eb;
+  background: #16a34a;
   color: white;
   display: flex;
   align-items: center;
@@ -181,12 +181,12 @@ button {
 
 .nav-item:hover {
   background: #f3f6fb;
-  color: #2563eb;
+  color: #16a34a;
 }
 
 .nav-item.active {
   background: #eaf2ff;
-  color: #2563eb;
+  color: #16a34a;
   font-weight: 600;
 }
 
@@ -232,7 +232,7 @@ button {
   height: 28px;
   border-radius: 50%;
   background: #eaf2ff;
-  color: #2563eb;
+  color: #16a34a;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -298,7 +298,7 @@ button {
 .topbar-signout-btn:hover {
   background: #dc2626;
   border-color: #dc2626;
-  color: #ffffff;
+  color: #f5f7fb;
   box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
   transform: translateY(-1px);
 }
@@ -324,7 +324,7 @@ button {
 .profile-signout-mini:hover {
   background: #dc2626;
   border-color: #dc2626;
-  color: #ffffff;
+  color: #f5f7fb;
 }
 
 /* MAIN */
@@ -339,7 +339,7 @@ button {
 
 .topbar {
   height: 86px;
-  background: #ffffff;
+  background: #f5f7fb;
   border-bottom: 1px solid #e7ebf2;
   display: flex;
   align-items: center;
@@ -456,7 +456,7 @@ button {
 }
 
 .primary-button {
-  background: #2563eb;
+  background: #16a34a;
   color: white;
   padding: 11px 17px;
   border-radius: 8px;
@@ -505,7 +505,7 @@ button {
 }
 
 .blue {
-  color: #2563eb;
+  color: #16a34a;
   background: #eaf2ff;
 }
 
@@ -559,7 +559,7 @@ button {
 }
 
 .panel {
-  background: #ffffff;
+  background: #f5f7fb;
   border: 1px solid #e7ebf2;
   border-radius: 13px;
   overflow: hidden;
@@ -587,7 +587,7 @@ button {
 
 .view-button {
   background: transparent;
-  color: #2563eb;
+  color: #16a34a;
   font-size: 10px;
   font-weight: 600;
 }
@@ -743,7 +743,7 @@ button {
   height: 145px;
   border-radius: 50%;
   background: conic-gradient(
-    #2563eb 0deg 331deg,
+    #16a34a 0deg 331deg,
     #e9eef5 331deg 360deg
   );
   display: flex;
@@ -809,7 +809,7 @@ button {
 }
 
 .taken-dot {
-  background: #2563eb;
+  background: #16a34a;
 }
 
 .missed-dot {
@@ -894,7 +894,7 @@ button {
 
 .reminder-badge {
   background: #eff6ff;
-  color: #2563eb;
+  color: #16a34a;
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 8px;
@@ -920,7 +920,7 @@ button {
   height: 31px;
   border-radius: 8px;
   background: #f1f6ff;
-  color: #2563eb;
+  color: #16a34a;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -974,7 +974,7 @@ button {
   height: 70px;
   border-radius: 20px;
   background: #eaf2ff;
-  color: #2563eb;
+  color: #16a34a;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1066,7 +1066,7 @@ button {
 
 .modal input:focus,
 .modal select:focus {
-  border-color: #2563eb;
+  border-color: #16a34a;
 }
 
 .modal-button {
@@ -1130,7 +1130,7 @@ button {
 }
 
 .filter-search-input:focus {
-  border-color: #2563eb;
+  border-color: #16a34a;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
@@ -1173,7 +1173,7 @@ button {
 
 .filter-tab-btn.active {
   background: white;
-  color: #2563eb;
+  color: #16a34a;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
@@ -1257,7 +1257,7 @@ button {
 
 .med-instructions-box {
   background: #f1f5f9;
-  border-left: 3px solid #2563eb;
+  border-left: 3px solid #16a34a;
   padding: 8px 10px;
   border-radius: 0 6px 6px 0;
   font-size: 10px;
@@ -1270,7 +1270,7 @@ button {
 
 .info-icon {
   font-weight: bold;
-  color: #2563eb;
+  color: #16a34a;
 }
 
 .med-card-footer {
@@ -1357,7 +1357,7 @@ button {
   height: 60px;
   border-radius: 16px;
   background: #eff6ff;
-  color: #2563eb;
+  color: #16a34a;
   font-size: 26px;
   display: flex;
   align-items: center;
@@ -1519,7 +1519,7 @@ button {
 
 .schedule-freq-pill {
   background: #eff6ff;
-  color: #2563eb;
+  color: #16a34a;
 }
 
 .schedule-instruction-text {
@@ -1619,7 +1619,7 @@ button {
 
 .auth-tab-btn.active {
   background: white;
-  color: #2563eb;
+  color: #16a34a;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
@@ -1673,7 +1673,7 @@ button {
 }
 
 .auth-form input:focus {
-  border-color: #2563eb;
+  border-color: #16a34a;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
@@ -1694,7 +1694,7 @@ button {
   display: block;
   font-size: 9px;
   font-weight: 700;
-  color: #2563eb;
+  color: #16a34a;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   margin-bottom: 4px;
@@ -1830,7 +1830,7 @@ button {
   width: 18px;
   height: 18px;
   border: 2.5px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #ffffff;
+  border-top-color: #f5f7fb;
   border-radius: 50%;
   animation: spin 0.65s linear infinite;
   display: inline-block;
@@ -1841,7 +1841,7 @@ button {
   width: 32px;
   height: 32px;
   border-color: rgba(37, 99, 235, 0.15);
-  border-top-color: #2563eb;
+  border-top-color: #16a34a;
 }
 
 @keyframes spin {
@@ -1862,7 +1862,7 @@ button {
 .link-button {
   background: none;
   border: none;
-  color: #2563eb;
+  color: #16a34a;
   font-weight: 600;
   font-size: inherit;
   cursor: pointer;
@@ -2003,7 +2003,7 @@ button {
 }
 
 .history-card {
-  background: #ffffff;
+  background: #f5f7fb;
   border: 1px solid #e7ebf2;
   border-radius: 14px;
   padding: 20px;
@@ -2227,7 +2227,7 @@ button {
 
 .reactivate-btn {
   background: #eff6ff;
-  color: #2563eb;
+  color: #16a34a;
   border: 1px solid #dbeafe;
 }
 
@@ -2264,8 +2264,8 @@ button {
 
 .radio-pill.active {
   background: #eff6ff;
-  border-color: #2563eb;
-  color: #2563eb;
+  border-color: #16a34a;
+  color: #16a34a;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
