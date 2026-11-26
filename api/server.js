@@ -63,8 +63,14 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like curl, postman) or matching dev origins
-      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://127.0.0.1:') || origin.startsWith('http://localhost:')) {
+      // Allow requests with no origin (curl, postman) or matching allowed/dev/vercel origins
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.startsWith('http://127.0.0.1:') ||
+        origin.startsWith('http://localhost:') ||
+        origin.endsWith('.vercel.app')
+      ) {
         return callback(null, true);
       }
       return callback(null, true);
@@ -112,6 +118,9 @@ app.get(['/api', '/api/'], (req, res) => {
  * Health Check Endpoint:
  * Used for container orchestrators, uptime monitoring, and ping testing.
  * Returns HTTP 200 when database and server are healthy, HTTP 503 when degraded.
+ *
+ * KEY FIX: Always attempt DB connection on health check — this ensures the
+ * connection is established immediately on first request (Vercel cold start).
  */
 app.get('/api/health', async (req, res) => {
   try {
@@ -134,8 +143,6 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-
-
 /**
  * Mount Authentication Router
  * Prefix: /api/auth
@@ -152,7 +159,7 @@ app.use('/api', featureRoutes);
 // ==============================================================================
 // 4. Static Frontend Production Build Serving (Single-Origin Architecture)
 // ==============================================================================
-const frontendDist = path.join(__dirname, '../frontend/dist');
+const frontendDist = path.join(__dirname, '../src/dist');
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
   app.get('*', (req, res, next) => {
@@ -288,3 +295,4 @@ const gracefulShutdown = async (signal) => {
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
+module.exports = app;

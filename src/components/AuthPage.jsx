@@ -18,7 +18,7 @@
  * Design: Matches the existing SmartPill blue-and-white healthcare theme.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // In development, Vite reverse-proxies /api to the backend, enabling a single URL (http://127.0.0.1:5173)
 const API_URL = import.meta.env.VITE_API_URL || "";
@@ -26,6 +26,32 @@ const API_URL = import.meta.env.VITE_API_URL || "";
 function AuthPage({ onLoginSuccess }) {
   // ─── Tab State ──────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("signin"); // "signin" | "register"
+
+  // ─── Database health status ──────────────────────────────────
+  // "checking" | "online" | "offline"
+  const [dbStatus, setDbStatus] = useState("checking");
+
+  // On mount: ping /api/health to detect if DB is configured and connected
+  useEffect(() => {
+    const checkDbHealth = async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout
+        try {
+          const res = await fetch(`${API_URL}/api/health`, {
+            signal: controller.signal,
+          });
+          const data = await res.json();
+          setDbStatus(res.ok && data?.database?.status === "connected" ? "online" : "offline");
+        } finally {
+          clearTimeout(timeout);
+        }
+      } catch {
+        setDbStatus("offline");
+      }
+    };
+    checkDbHealth();
+  }, []);
 
   // ─── Sign In Form State ─────────────────────────────────────
   const [loginData, setLoginData] = useState({
@@ -296,6 +322,65 @@ function AuthPage({ onLoginSuccess }) {
             <span>Health Management System</span>
           </div>
         </div>
+
+        {/* DB Status Banner */}
+        {dbStatus === "checking" && (
+          <div style={{
+            background: "#f0f4ff", border: "1px solid #c3d0f0",
+            borderRadius: "8px", padding: "10px 14px", marginBottom: "12px",
+            fontSize: "13px", color: "#4a6fa5", display: "flex",
+            alignItems: "center", gap: "8px"
+          }}>
+            <span style={{ fontSize: "16px" }}>⏳</span>
+            <span>Connecting to database…</span>
+          </div>
+        )}
+        {dbStatus === "online" && (
+          <div style={{
+            background: "#f0faf4", border: "1px solid #a8d5b5",
+            borderRadius: "8px", padding: "10px 14px", marginBottom: "12px",
+            fontSize: "13px", color: "#2e7d52", display: "flex",
+            alignItems: "center", gap: "8px"
+          }}>
+            <span style={{ fontSize: "16px" }}>✅</span>
+            <span>PostgreSQL connected — ready to use.</span>
+          </div>
+        )}
+        {dbStatus === "offline" && (
+          <div style={{
+            background: "#fff8f0", border: "1px solid #f5c6a0",
+            borderRadius: "10px", padding: "14px 16px", marginBottom: "16px",
+            fontSize: "13px", color: "#7a3a00"
+          }}>
+            <div style={{ fontWeight: "700", fontSize: "14px", marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>⚠️</span> Database Not Connected
+            </div>
+            <p style={{ margin: "0 0 10px 0", lineHeight: "1.5" }}>
+                The app cannot reach its PostgreSQL database. Check that{" "}
+                <strong>DATABASE_URL</strong> points to a running database and that its schema is initialized.
+            </p>
+            <p style={{ margin: "0 0 10px 0", lineHeight: "1.5", fontWeight: "600" }}>
+                For a deployment, verify these settings:
+            </p>
+            <ol style={{ margin: "0 0 10px 0", paddingLeft: "20px", lineHeight: "1.8" }}>
+              <li>Go to your <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: "#1a73e8" }}>Vercel Dashboard</a> → Project → <strong>Settings → Environment Variables</strong></li>
+                <li>Set <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>DATABASE_URL</code> to your PostgreSQL connection string.</li>
+                <li>Set <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>JWT_SECRET</code> to a strong random secret.</li>
+                <li>Ensure the database is reachable and the schema migrations have run, then redeploy.</li>
+            </ol>
+            <button
+              type="button"
+                onClick={() => { setDbStatus("checking"); fetch(`${API_URL}/api/health`).then(r => r.ok ? r.json() : null).then(d => setDbStatus(d?.database?.status === "connected" ? "online" : "offline")).catch(() => setDbStatus("offline")); }}
+              style={{
+                background: "#e8703a", color: "white", border: "none",
+                borderRadius: "6px", padding: "7px 14px", fontSize: "12px",
+                cursor: "pointer", fontWeight: "600"
+              }}
+            >
+              🔄 Retry Connection
+            </button>
+          </div>
+        )}
 
         {/* Tab Switcher */}
         <div className="auth-tab-switch">
