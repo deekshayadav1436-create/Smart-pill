@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect } from "react";
+import FeaturePages from "./components/FeaturePages";
 import "./App.css";
 import MedicationCard from "./components/MedicationCard";
 import AuthPage from "./components/AuthPage";
@@ -835,7 +836,7 @@ function App() {
                     className="progress-circle"
                     style={{
                       background: `conic-gradient(
-                        #2563eb 0deg ${
+                        #16a34a 0deg ${
                           adherence * 3.6
                         }deg,
                         #e9eef5 ${
@@ -1083,24 +1084,17 @@ function App() {
           />
         )}
 
-        {/* OTHER PAGES */}
+        {/* FEATURE PAGES */}
         {activePage !== "Dashboard" &&
           activePage !== "Medications" &&
           activePage !== "Medication History" && (
-            <div className="placeholder-page">
-              <div className="placeholder-icon">✦</div>
-              <h2>{activePage}</h2>
-              <p>
-                This module is ready to be developed in the next stage of the
-                SmartPill system.
-              </p>
-              <button
-                className="primary-button"
-                onClick={() => setActivePage("Dashboard")}
-              >
-                ← Back to Dashboard
-              </button>
-            </div>
+            <FeaturePages
+              activePage={activePage}
+              medications={medications}
+              onUpdateMedication={handleUpdateMedication}
+              formatTime={formatTime}
+              getAuthHeaders={getAuthHeaders}
+            />
           )}
 
       </main>

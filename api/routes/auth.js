@@ -22,7 +22,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { createUser, findByUsername, findByEmail, verifyPassword } = require('../models/User');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
@@ -116,7 +116,7 @@ router.post(
       const { fullName, username, email, password } = req.body;
 
       // Check if username is already taken
-      const existingUsername = await User.findOne({ username: username.toLowerCase() });
+      const existingUsername = await findByUsername(username.toLowerCase());
       if (existingUsername) {
         return res.status(409).json({
           success: false,
@@ -125,7 +125,7 @@ router.post(
       }
 
       // Check if email is already registered
-      const existingEmail = await User.findOne({ email: email.toLowerCase() });
+      const existingEmail = await findByEmail(email.toLowerCase());
       if (existingEmail) {
         return res.status(409).json({
           success: false,
@@ -133,18 +133,11 @@ router.post(
         });
       }
 
-      // Instantiate new user document (password gets hashed automatically by pre-save hook)
-      const user = new User({
-        fullName,
-        username: username.toLowerCase(),
-        email: email.toLowerCase(),
-        password
-      });
-
-      await user.save();
+      // Create new user using PostgreSQL helper (password will be hashed)
+      const user = await createUser({ fullName, username: username.toLowerCase(), email: email.toLowerCase(), password });
 
       // Issue JWT token
-      const token = generateToken(user._id);
+      const token = generateToken(user.id);
 
       // Attach token as httpOnly cookie
       res.cookie(COOKIE_NAME, token, getCookieOptions());
@@ -155,7 +148,7 @@ router.post(
         message: 'User registered successfully',
         token,
         user: {
-          _id: user._id,
+          id: user.id,
           fullName: user.fullName,
           username: user.username,
           email: user.email,
@@ -200,10 +193,10 @@ router.post(
 
       // Detect whether identifier is email or username
       const isEmail = cleanIdentifier.includes('@');
-      const query = isEmail ? { email: cleanIdentifier } : { username: cleanIdentifier };
+      const user = isEmail
+        ? await findByEmail(cleanIdentifier)
+        : await findByUsername(cleanIdentifier);
 
-      // Explicitly select '+password' because select: false is configured on UserSchema
-      const user = await User.findOne(query).select('+password');
 
       if (!user) {
         return res.status(401).json({
@@ -214,7 +207,7 @@ router.post(
       }
 
       // Verify password match using bcrypt comparison method
-      const isMatch = await user.comparePassword(password);
+      const isMatch = await verifyPassword(password, user.password);
       if (!isMatch) {
         return res.status(401).json({
           success: false,
@@ -224,7 +217,7 @@ router.post(
       }
 
       // Generate JWT
-      const token = generateToken(user._id);
+      const token = generateToken(user.id);
 
       // Store in httpOnly cookie
       res.cookie(COOKIE_NAME, token, getCookieOptions());
@@ -234,7 +227,7 @@ router.post(
         message: 'Logged in successfully',
         token,
         user: {
-          _id: user._id,
+          id: user.id,
           fullName: user.fullName,
           username: user.username,
           email: user.email,
@@ -254,12 +247,11 @@ router.get('/me', authenticate, async (req, res) => {
   return res.status(200).json({
     success: true,
     user: {
-      _id: req.user._id,
+      id: req.user.id,
       fullName: req.user.fullName,
       username: req.user.username,
       email: req.user.email,
-      createdAt: req.user.createdAt,
-      updatedAt: req.user.updatedAt
+      createdAt: req.user.createdAt
     }
   });
 });

@@ -37,17 +37,16 @@ function AuthPage({ onLoginSuccess }) {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout
-        const res = await fetch(`${API_URL}/api/health`, {
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        const data = await res.json();
-        if (data?.database?.status === "connected") {
-          setDbStatus("online");
-        } else {
-          setDbStatus("offline");
+        try {
+          const res = await fetch(`${API_URL}/api/health`, {
+            signal: controller.signal,
+          });
+          const data = await res.json();
+          setDbStatus(res.ok && data?.database?.status === "connected" ? "online" : "offline");
+        } finally {
+          clearTimeout(timeout);
         }
-      } catch (err) {
+      } catch {
         setDbStatus("offline");
       }
     };
@@ -344,7 +343,7 @@ function AuthPage({ onLoginSuccess }) {
             alignItems: "center", gap: "8px"
           }}>
             <span style={{ fontSize: "16px" }}>✅</span>
-            <span>Database connected — ready to use.</span>
+            <span>PostgreSQL connected — ready to use.</span>
           </div>
         )}
         {dbStatus === "offline" && (
@@ -357,25 +356,21 @@ function AuthPage({ onLoginSuccess }) {
               <span>⚠️</span> Database Not Connected
             </div>
             <p style={{ margin: "0 0 10px 0", lineHeight: "1.5" }}>
-              The database is offline. This is because{" "}
-              <strong>MONGODB_URI</strong> is not set in your Vercel project settings.
+                The app cannot reach its PostgreSQL database. Check that{" "}
+                <strong>DATABASE_URL</strong> points to a running database and that its schema is initialized.
             </p>
             <p style={{ margin: "0 0 10px 0", lineHeight: "1.5", fontWeight: "600" }}>
-              Fix in 2 minutes:
+                For a deployment, verify these settings:
             </p>
             <ol style={{ margin: "0 0 10px 0", paddingLeft: "20px", lineHeight: "1.8" }}>
-              <li>Go to <a href="https://www.mongodb.com/atlas" target="_blank" rel="noopener noreferrer" style={{ color: "#1a73e8" }}>mongodb.com/atlas</a> → create a <strong>free M0 cluster</strong></li>
-              <li>Create a database user, set Network Access → <strong>0.0.0.0/0</strong></li>
-              <li>Copy the connection string: <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>mongodb+srv://user:pass@cluster.mongodb.net/smartpill</code></li>
               <li>Go to your <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: "#1a73e8" }}>Vercel Dashboard</a> → Project → <strong>Settings → Environment Variables</strong></li>
-              <li>Add: <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>MONGODB_URI</code> = your Atlas connection string</li>
-              <li>Also add: <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>JWT_SECRET</code> = any random 32+ char string</li>
-              <li>Also add: <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>NODE_ENV</code> = <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>production</code></li>
-              <li><strong>Redeploy</strong> in Vercel (Deployments → ⋯ → Redeploy)</li>
+                <li>Set <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>DATABASE_URL</code> to your PostgreSQL connection string.</li>
+                <li>Set <code style={{ background: "#f5e6d8", padding: "2px 5px", borderRadius: "4px", fontSize: "11px" }}>JWT_SECRET</code> to a strong random secret.</li>
+                <li>Ensure the database is reachable and the schema migrations have run, then redeploy.</li>
             </ol>
             <button
               type="button"
-              onClick={() => { setDbStatus("checking"); fetch(`${API_URL}/api/health`).then(r => r.json()).then(d => setDbStatus(d?.database?.status === "connected" ? "online" : "offline")).catch(() => setDbStatus("offline")); }}
+                onClick={() => { setDbStatus("checking"); fetch(`${API_URL}/api/health`).then(r => r.ok ? r.json() : null).then(d => setDbStatus(d?.database?.status === "connected" ? "online" : "offline")).catch(() => setDbStatus("offline")); }}
               style={{
                 background: "#e8703a", color: "white", border: "none",
                 borderRadius: "6px", padding: "7px 14px", fontSize: "12px",

@@ -2,8 +2,8 @@
   "version": 2,
   "framework": null,
   "installCommand": "npm install",
-  "buildCommand": "node build.js",
-  "outputDirectory": "frontend/dist",
+  "buildCommand": "npm run build",
+  "outputDirectory": "src/dist",
   "rewrites": [
     {
       "source": "/api",

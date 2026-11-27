@@ -190,7 +190,7 @@ function MedicationHistoryView({
         <div
           className="stat-card"
           onClick={() => setActiveTab("active")}
-          style={{ cursor: "pointer", borderColor: activeTab === "active" ? "#2563eb" : "#edf0f5" }}
+          style={{ cursor: "pointer", borderColor: activeTab === "active" ? "#16a34a" : "#edf0f5" }}
         >
           <div className="stat-top">
             <span className="stat-icon blue">🟢</span>
@@ -203,7 +203,7 @@ function MedicationHistoryView({
         <div
           className="stat-card"
           onClick={() => setActiveTab("history")}
-          style={{ cursor: "pointer", borderColor: activeTab === "history" ? "#2563eb" : "#edf0f5" }}
+          style={{ cursor: "pointer", borderColor: activeTab === "history" ? "#16a34a" : "#edf0f5" }}
         >
           <div className="stat-top">
             <span className="stat-icon purple">⚪</span>
@@ -216,7 +216,7 @@ function MedicationHistoryView({
         <div
           className="stat-card"
           onClick={() => setActiveTab("all")}
-          style={{ cursor: "pointer", borderColor: activeTab === "all" ? "#2563eb" : "#edf0f5" }}
+          style={{ cursor: "pointer", borderColor: activeTab === "all" ? "#16a34a" : "#edf0f5" }}
         >
           <div className="stat-top">
             <span className="stat-icon green">📋</span>
